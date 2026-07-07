@@ -1,18 +1,19 @@
 #!/usr/bin/env python3
 """
-Base Airdrop Eligibility Checker (публічний шаблон).
+Base Airdrop Eligibility Checker (public template).
 
-Для кожного гаманця з wallets.json:
-1. Рахує "activity score" (0-100) на основі on-chain активності в Base —
-   орієнтир "чи виглядає гаманець живим" для майбутніх airdrop-кампаній,
-   критерії яких ще невідомі.
-2. Перевіряє гаманець на членство в кожній кампанії з campaigns.json —
-   підтримує два поширені формати публічних airdrop-списків:
-   - плаский масив адрес: ["0xabc...", "0xdef..."]
-   - об'єкт адреса -> сума: {"0xabc...": "1500000000000000000"}
+For every wallet in wallets.json:
+1. Computes an "activity score" (0-100) based on on-chain activity on
+   Base — a rough indicator of "does this wallet look alive" for future
+   airdrop campaigns whose criteria aren't known yet.
+2. Checks the wallet's membership in each campaign from campaigns.json —
+   supports two common formats for publicly published airdrop lists:
+   - a flat array of addresses: ["0xabc...", "0xdef..."]
+   - an address -> amount object: {"0xabc...": "1500000000000000000"}
 
-Це шаблон без прив'язки до конкретного гаманця чи проєкту — додай свої
-адреси в wallets.json і (опційно) кампанії в campaigns.json.
+This is a generic template — no personal wallet or project is baked in.
+Add your own addresses to wallets.json and (optionally) campaigns to
+campaigns.json.
 """
 
 import os
@@ -29,7 +30,7 @@ WALLETS_FILE = os.environ.get("WALLETS_FILE", "wallets.json")
 CAMPAIGNS_FILE = os.environ.get("CAMPAIGNS_FILE", "campaigns.json")
 
 if not API_KEY:
-    raise SystemExit("❌ Не заданий секрет BLOCKSCOUT_API_KEY")
+    raise SystemExit("❌ BLOCKSCOUT_API_KEY secret is not set")
 
 
 def load_json(path, default):
@@ -52,7 +53,7 @@ def api_get(params, retries=2):
         except requests.exceptions.RequestException as e:
             if attempt < retries:
                 continue
-            print(f"⚠️  Не вдалося отримати дані ({params.get('action')}): {e}")
+            print(f"⚠️  Failed to fetch data ({params.get('action')}): {e}")
             return None
 
 
@@ -94,13 +95,13 @@ def compute_activity_score(txs, balance_eth):
     wallet_age_days = max(1, (timestamps[-1] - timestamps[0]) // 86400)
     unique_contacts = len({tx.get("to", "").lower() for tx in txs if tx.get("to")})
 
-    # Проста евристична вага компонентів, підсумок обмежений 100
+    # Simple heuristic weighting of components, total capped at 100
     score = 0
-    score += min(30, tx_count)                     # до 30 балів за кількість транзакцій
-    score += min(25, active_days * 2)               # до 25 балів за унікальні активні дні
-    score += min(20, unique_contacts)                # до 20 балів за різноманіття контрактів
-    score += min(15, wallet_age_days // 10)          # до 15 балів за вік гаманця
-    score += 10 if balance_eth > 0 else 0            # 10 балів за ненульовий баланс
+    score += min(30, tx_count)                     # up to 30 points for tx count
+    score += min(25, active_days * 2)               # up to 25 points for unique active days
+    score += min(20, unique_contacts)                # up to 20 points for contract diversity
+    score += min(15, wallet_age_days // 10)          # up to 15 points for wallet age
+    score += 10 if balance_eth > 0 else 0            # 10 points for a non-zero balance
     score = min(100, score)
 
     return {
@@ -119,7 +120,7 @@ def fetch_campaign_list(campaign):
         resp.raise_for_status()
         data = resp.json()
     except (requests.exceptions.RequestException, json.JSONDecodeError) as e:
-        print(f"⚠️  Не вдалося завантажити кампанію '{campaign.get('name')}': {e}")
+        print(f"⚠️  Failed to load campaign '{campaign.get('name')}': {e}")
         return None
 
     if isinstance(data, list):
@@ -127,7 +128,7 @@ def fetch_campaign_list(campaign):
     if isinstance(data, dict):
         return {addr.lower(): amount for addr, amount in data.items()}
 
-    print(f"⚠️  Невідомий формат даних для кампанії '{campaign.get('name')}'")
+    print(f"⚠️  Unknown data format for campaign '{campaign.get('name')}'")
     return None
 
 
@@ -155,16 +156,16 @@ def main():
 
     if not wallets:
         print(
-            f"⚠️  У {WALLETS_FILE} немає реальних адрес (тільки приклад-заглушка). "
-            f"Додай свої гаманці, щоб отримати результат."
+            f"⚠️  {WALLETS_FILE} has no real addresses (only the example placeholder). "
+            f"Add your own wallets to get a result."
         )
         return
 
-    print(f"🔍 Перевірка {len(wallets)} гаманця(ів) у мережі Base (chainId={CHAIN_ID})")
+    print(f"🔍 Checking {len(wallets)} wallet(s) on Base (chainId={CHAIN_ID})")
     if campaigns:
-        print(f"📋 Кампаній для перевірки: {len(campaigns)}")
+        print(f"📋 Campaigns to check: {len(campaigns)}")
     else:
-        print("📋 Кампаній у campaigns.json немає — рахую тільки activity score")
+        print("📋 No campaigns in campaigns.json — computing activity score only")
 
     for address in wallets:
         print("")
@@ -177,21 +178,21 @@ def main():
         print(
             f"📊 Activity score: {stats['score']}/100 | "
             f"tx: {stats['tx_count']} | "
-            f"активні дні: {stats['active_days']} | "
-            f"унікальні контакти: {stats['unique_contacts']} | "
-            f"вік гаманця: {stats['wallet_age_days']} дн | "
-            f"баланс: {stats['balance_eth']:.6f} ETH"
+            f"active days: {stats['active_days']} | "
+            f"unique contacts: {stats['unique_contacts']} | "
+            f"wallet age: {stats['wallet_age_days']} days | "
+            f"balance: {stats['balance_eth']:.6f} ETH"
         )
 
         if campaigns:
             for name, status, amount in check_campaigns(address, campaigns):
                 if status == "eligible":
-                    extra = f" | сума: {amount}" if amount else ""
-                    print(f"✅ [{name}] Є в списку на airdrop{extra}")
+                    extra = f" | amount: {amount}" if amount else ""
+                    print(f"✅ [{name}] Eligible for airdrop{extra}")
                 elif status == "not_eligible":
-                    print(f"❌ [{name}] Немає в списку")
+                    print(f"❌ [{name}] Not in the list")
                 else:
-                    print(f"⚠️  [{name}] Не вдалося перевірити")
+                    print(f"⚠️  [{name}] Could not be checked")
 
 
 if __name__ == "__main__":
