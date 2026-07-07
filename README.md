@@ -1,100 +1,101 @@
 # Base Airdrop Eligibility Checker
 
-Готовий шаблон для GitHub Actions, який щодня перевіряє гаманці в мережі
-**Base** і рахує:
+A ready-to-use GitHub Actions template that daily checks wallets on
+**Base** and computes:
 
-1. **Activity score (0-100)** — оцінка on-chain активності гаманця
-   (кількість транзакцій, унікальні активні дні, різноманіття контрактів,
-   вік гаманця, баланс). Орієнтир "чи виглядає гаманець живим" для
-   майбутніх airdrop-кампаній, критерії яких ще невідомі.
-2. **Перевірку конкретних airdrop-кампаній** — додай посилання на
-   опублікований список адрес будь-якого проєкту в `campaigns.json`,
-   і скрипт звірить твої гаманці з цим списком.
+1. **Activity score (0-100)** — an estimate of on-chain activity
+   (transaction count, unique active days, contract diversity, wallet
+   age, balance). A rough indicator of "does this wallet look alive"
+   for future airdrop campaigns whose criteria aren't known yet.
+2. **Specific airdrop campaign checks** — add a link to a published
+   list of eligible addresses for any project in `campaigns.json`, and
+   the script will check your wallets against that list.
 
-Це шаблон — тут немає нічиїх реальних гаманців чи ключів. Форкни репозиторій
-і додай свої дані.
+This is a template — there are no real wallets or keys baked in here.
+Fork the repository and add your own data.
 
-## Швидкий старт
+## Quick start
 
-### 1. Форкни або скопіюй репозиторій
+### 1. Fork or copy this repository
 
-### 2. Отримай безкоштовний Blockscout Pro API key
+### 2. Get a free Blockscout Pro API key
 
 1. https://dev.blockscout.com/ → Login
-2. Створи API key (безкоштовний тариф покриває Base)
+2. Create an API key (the free tier covers Base)
 
-### 3. Додай secret у свій репозиторій
+### 3. Add the secret to your repository
 
 **Settings → Secrets and variables → Actions → New repository secret**
 - Name: `BLOCKSCOUT_API_KEY`
-- Value: твій ключ
+- Value: your key
 
-### 4. Заміни приклад у `wallets.json` на свої адреси
+### 4. Replace the example in `wallets.json` with your own addresses
 
 ```json
 [
-  "0xТвояАдреса1",
-  "0xТвояАдреса2"
+  "0xYourAddress1",
+  "0xYourAddress2"
 ]
 ```
 
-### 5. (Опційно) Додай конкретні airdrop-кампанії в `campaigns.json`
+### 5. (Optional) Add specific airdrop campaigns to `campaigns.json`
 
-Коли проєкт публікує список адрес-отримувачів (типово JSON — масив адрес
-або об'єкт `адреса -> сума`):
+When a project publishes a list of recipient addresses (typically JSON —
+either a flat array or an address -> amount object):
 
 ```json
 {
   "campaigns": [
     {
-      "name": "НазваПроєкту",
-      "url": "https://raw.githubusercontent.com/проєкт/airdrop/main/eligible.json"
+      "name": "ProjectName",
+      "url": "https://raw.githubusercontent.com/project/airdrop/main/eligible.json"
     }
   ]
 }
 ```
 
-Підтримуються два формати відповіді за цим URL:
-- `["0xabc...", "0xdef..."]` — просто масив адрес
-- `{"0xabc...": "1500000000000000000", ...}` — адреса → сума (wei)
+Two response formats are supported at that URL:
+- `["0xabc...", "0xdef..."]` — a plain array of addresses
+- `{"0xabc...": "1500000000000000000", ...}` — address → amount (wei)
 
-### 6. Запусти вручну
+### 6. Run it manually
 
 **Actions → Base Airdrop Eligibility Checker → Run workflow**
 
-Далі запускається автоматично раз на день о 09:00 UTC (міняється в
-`.github/workflows/check.yml`, рядок `cron`).
+After that it runs automatically once a day at 09:00 UTC (change the
+`cron` line in `.github/workflows/check.yml` to adjust).
 
-## Структура
+## Structure
 
 ```
 .
-├── wallets.json                  # твої гаманці (заміни приклад)
-├── campaigns.json                # airdrop-кампанії для перевірки (опційно)
-├── checker.py                    # основний скрипт
+├── wallets.json                  # your wallets (replace the example)
+├── campaigns.json                # airdrop campaigns to check (optional)
+├── checker.py                    # main script
 ├── requirements.txt
-└── .github/workflows/check.yml   # щоденний запуск + ручний
+└── .github/workflows/check.yml   # daily run + manual trigger
 ```
 
-## Приклад виводу в логах
+## Example output
 
 ```
-🔍 Перевірка 1 гаманця(ів) у мережі Base (chainId=8453)
-📋 Кампаній для перевірки: 1
+🔍 Checking 1 wallet(s) on Base (chainId=8453)
+📋 Campaigns to check: 1
 
-=== 0xТвояАдреса ===
-📊 Activity score: 42/100 | tx: 12 | активні дні: 5 | унікальні контакти: 4 | вік гаманця: 30 дн | баланс: 0.004500 ETH
-✅ [НазваПроєкту] Є в списку на airdrop | сума: 1500000000000000000
+=== 0xYourAddress ===
+📊 Activity score: 42/100 | tx: 12 | active days: 5 | unique contacts: 4 | wallet age: 30 days | balance: 0.004500 ETH
+✅ [ProjectName] Eligible for airdrop | amount: 1500000000000000000
 ```
 
-## Обмеження
+## Limitations
 
-- `activity score` — це проста евристика для орієнтиру, не офіційний
-  критерій жодного конкретного airdrop
-- Формат кампаній підтримує лише прямий JSON за URL; якщо в проєкту API
-  вимагає POST-запит з підписом чи авторизацією — доведеться доробити
-  функцію `fetch_campaign_list` у `checker.py`
+- The `activity score` is a simple heuristic for orientation, not an
+  official criterion of any specific airdrop.
+- Campaign support only handles a plain JSON response at a URL; if a
+  project's API requires a signed POST request or authentication,
+  you'll need to extend the `fetch_campaign_list` function in
+  `checker.py`.
 
-## Ліцензія
+## License
 
-MIT — використовуй, змінюй, форкай вільно.
+MIT — use it, modify it, fork it freely.
